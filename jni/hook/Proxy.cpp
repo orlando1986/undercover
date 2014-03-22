@@ -67,27 +67,18 @@ static ArrayObject* boxMethodArgs(const Method* method, const u4* args) {
 
 void realInvokeOriginalMethodNative(const u4* args, JValue* pResult,
 		const Method* method, ::Thread* self) {
-    Method* meth = (Method*) args[0];
-//    if (meth == NULL) {
-//        meth = dvmGetMethodFromReflectObj((Object*) args[0]);
-//    }
-    Object* thisObject = (Object*) args[1]; // null for static methods
+	Method* meth = dvmGetMethodFromReflectObj((Object*) args[0]);
+    Object* thisObject = (Object*) args[1];
     ArrayObject* argList = (ArrayObject*) args[2];
     ArrayObject* params = (ArrayObject*) args[3];
     ClassObject* returnType = (ClassObject*) args[4];
 
-    Method* hookInfo = (Method*) calloc(1, sizeof(Method));
-    memcpy(hookInfo, meth, sizeof(Method));
-	CLEAR_METHOD_FLAG(hookInfo, ACC_NATIVE);
-    // invoke the method
-    pResult->l = dvmInvokeMethod(thisObject, hookInfo, argList, params, returnType, true);
+    pResult->l = dvmInvokeMethod(thisObject, (Method*) meth->insns, argList, params, returnType, true);
 }
 
 static void xposedCallHandler(const u4* args, JValue* pResult,
 		const Method* method, ::Thread* self) {
 
-//	Method* originalReflected = (Method*) method->insns;
-//	CLEAR_METHOD_FLAG(originalReflected, ACC_NATIVE);
 
 	// convert/box arguments
 	Object* thisObject = NULL;
@@ -159,15 +150,17 @@ void hookMethod(JNIEnv* env, jclass clazz, jobject reflectedMethodIndirect,
 				"could not get internal representation for method");
 		return;
 	}
+
 	// Save a copy of the original method and other hook info
-//	Method* hookInfo = (Method*) calloc(1, sizeof(Method));
-//	memcpy(hookInfo, method, sizeof(Method));
+	Method* hookInfo = (Method*) calloc(1, sizeof(Method));
+	memcpy(hookInfo, method, sizeof(Method));
+
 	// Replace method with our own code
 	method->nativeFunc = xposedCallHandler;
-//	method->insns = (const u2*) hookInfo;
-//	method->registersSize = method->insSize;
+	method->insns = (const u2*) hookInfo;
+
 	int argsSize = dvmComputeMethodArgsSize(method) + 1;
 	method->registersSize = method->insSize = argsSize;
-//	method->outsSize = 0;
+	method->outsSize = 0;
 	SET_METHOD_FLAG(method, ACC_NATIVE);
 }

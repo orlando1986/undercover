@@ -15,7 +15,7 @@ public class Hook {
         Method hookMethod = null;
         try {
             Class actyclass = Class.forName("android.app.Activity");
-            hookMethod = actyclass.getDeclaredMethod("onContentChanged", (Class[]) null);
+            hookMethod = actyclass.getDeclaredMethod("onResume", (Class[]) null);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -35,7 +35,6 @@ public class Hook {
                 return false;
             }
         }, true);
-        new Activity().onContentChanged();
     }
 
 }
