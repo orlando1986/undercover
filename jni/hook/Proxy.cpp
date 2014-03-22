@@ -67,14 +67,14 @@ static ArrayObject* boxMethodArgs(const Method* method, const u4* args) {
 
 void realInvokeOriginalMethodNative(const u4* args, JValue* pResult,
 		const Method* method, ::Thread* self) {
-    Method* meth = (Method*) args[1];
-    if (meth == NULL) {
-        meth = dvmGetMethodFromReflectObj((Object*) args[0]);
-    }
-    Object* thisObject = (Object*) args[2]; // null for static methods
-    ArrayObject* argList = (ArrayObject*) args[3];
-    ArrayObject* params = (ArrayObject*) args[4];
-    ClassObject* returnType = (ClassObject*) args[5];
+    Method* meth = (Method*) args[0];
+//    if (meth == NULL) {
+//        meth = dvmGetMethodFromReflectObj((Object*) args[0]);
+//    }
+    Object* thisObject = (Object*) args[1]; // null for static methods
+    ArrayObject* argList = (ArrayObject*) args[2];
+    ArrayObject* params = (ArrayObject*) args[3];
+    ClassObject* returnType = (ClassObject*) args[4];
 
     Method* hookInfo = (Method*) calloc(1, sizeof(Method));
     memcpy(hookInfo, meth, sizeof(Method));
