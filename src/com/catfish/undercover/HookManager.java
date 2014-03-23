@@ -1,52 +1,66 @@
 package com.catfish.undercover;
 
-import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
 import java.util.HashMap;
 import java.util.Map;
 
 import android.util.Log;
 
+import com.catfish.undercover.HookedMethod.HookedCallback;
+
 /**
  * Welcome to use Hook tool coded by catfish, hope you can enjoy the java hook
- * journey. You can use any supported methods here in this class to implement a
- * lightweight hook function. We support all methods replacement except those
- * with the modifier of private, constructor, native and static.
+ * journey. You can hook any non-native method with a HookedCallback here.
  * 
  * @author catfish
  * 
  */
 
 public class HookManager {
-    public final static String TAG = "catfish";
-    private final static boolean DEBUG = true;
-    private final static Map<String, HookedCallback> sMethodCache = new HashMap<String, HookedCallback>();
+    private final static String TAG = Hook.TAG;
+    private final static Map<String, HookedMethod> sMethodCache = new HashMap<String, HookedMethod>();
 
-    public final static void setMethodHooked(Method hookMethod, HookedCallback callback, boolean force) {
+    /**
+     * setMethodHooked() can give you a chance to hook a non-native method with
+     * a HookedCallback. Each time a target method is invoked, the callback is
+     * called, and you can decide how to perform this method. Warning: there is
+     * only one callback registered for a specific method, so you need to
+     * consider the callback registered before when you are going to set a
+     * callback for a method.
+     * 
+     * @param hookMethod
+     *            The method you want to hooked
+     * @param callback
+     *            The callback is called when the target method is invoked
+     */
+    public final static void setMethodHooked(Method hookMethod, HookedCallback callback) {
+        if (callback == null) {
+            Log.e(TAG, "null HookedCallback is not allowed");
+            return;
+        }
         String key = generateKey(hookMethod);
-        if (sMethodCache.containsKey(key)) {
-            sMethodCache.put(key, callback);
-            return;
-        }
-        if (Modifier.isNative(hookMethod.getModifiers()) && !force) {
-            Log.e(TAG, "this is a native method, we did not force to hook it");
+        HookedMethod fake = sMethodCache.get(key);
+        if (fake != null) {
+            fake.mCallback = callback;
             return;
         }
 
-        Class<?> declaringClass = hookMethod.getDeclaringClass();
-        int slot = (int) getSlotField(hookMethod);
-
-        Class<?>[] parameterTypes = ((Method) hookMethod).getParameterTypes();
-        Class<?> returnType = ((Method) hookMethod).getReturnType();
-
-        AdditionalHookInfo additionalInfo = new AdditionalHookInfo(parameterTypes, returnType);
-
-        hookMethodNative(hookMethod, declaringClass, slot, additionalInfo);
+        hookMethodNative(hookMethod);
         synchronized (sMethodCache) {
-            sMethodCache.put(key, callback);
+            sMethodCache.put(key, new HookedMethod(callback));
         }
+    }
+
+    public static HookedCallback getHookedCallback(Method m) {
+        String key = generateKey(m);
+        HookedMethod hm = sMethodCache.get(key);
+        synchronized (sMethodCache) {
+            if (hm != null) {
+                return hm.mCallback;
+            }
+        }
+        return null;
     }
 
     private final static String generateKey(Method m) {
@@ -64,73 +78,23 @@ public class HookManager {
         return sb.toString();
     }
 
-    public static HookedCallback getHookedCallback(Method m) {
-        String key = generateKey(m);
-        synchronized (sMethodCache) {
-            return sMethodCache.get(key);
+    private static Object handleHookedMethod(Method method, Object thisObject, Object[] args) throws Throwable {
+
+        HookedMethod hookkedmethod = sMethodCache.get(generateKey(method));
+        if (hookkedmethod != null) {
+            synchronized (hookkedmethod) {
+                hookkedmethod.mMethod = method;
+                if (hookkedmethod.mCallback != null) {
+                    return hookkedmethod.mCallback.invoke(hookkedmethod, thisObject, args);
+                }
+            }
         }
-    }
 
-    private static int getSlotField(Method m) {
-        try {
-            Class<?> clazz = m.getClass();
-            Field f = clazz.getDeclaredField("slot");
-            f.setAccessible(true);
-            return f.getInt(m);
-        } catch (IllegalAccessException e) {
-            throw new IllegalAccessError(e.getMessage());
-        } catch (Exception e1) {
-            Log.e(TAG, e1.getMessage(), e1);
-            return -1;
-        }
-    }
-
-    static void LOGD(String msg) {
-        if (DEBUG) {
-            Log.d(TAG, msg);
-        }
-    }
-
-    @SuppressWarnings("unused")
-    private static class AdditionalHookInfo {
-        private Class<?>[] parameterTypes;
-        private Class<?> returnType;
-
-        private AdditionalHookInfo(Class<?>[] parameterTypes, Class<?> returnType) {
-            this.parameterTypes = parameterTypes;
-            this.returnType = returnType;
-        }
-    }
-
-    public interface HookedCallback {
-
-        public Object preCalled();
-
-        public boolean needInvokeOriginal();
-
-        public Object postCalled();
+        return invokeOriginalMethod(method, thisObject, args, method.getParameterTypes(), method.getReturnType());
 
     }
 
-    private static Object handleHookedMethod(Method method, Object thisObject, Object[] args)
-            throws Throwable {
-        Log.e(TAG, "version4.0 success! --- " + method.getName());
-        invokeOriginalMethod(method, thisObject, args, method.getParameterTypes(), method.getReturnType());
-//        method.invoke(thisObject, args);
-        /*
-         * AdditionalHookInfo additionalInfo = (AdditionalHookInfo)
-         * additionalInfoObj;
-         * 
-         * synchronized (sMethodCache) { HookedCallback callback =
-         * sMethodCache.get(generateKey(method)); if (callback == null) { return
-         * invokeOriginalMethodNative(method, originalMethodId,
-         * additionalInfo.parameterTypes, additionalInfo.returnType, thisObject,
-         * args); } }
-         */
-        return null;
+    private native synchronized static void hookMethodNative(Method method);
 
-    }
-
-    private native synchronized static void hookMethodNative(Method method, Class<?> declaringClass, int slot, Object additionalInfo);
-    private native synchronized static Object invokeOriginalMethod(Method method, Object obj, Object[] args, Object[] param, Object returnType);
+    native synchronized static Object invokeOriginalMethod(Method method, Object obj, Object[] args, Object[] param, Object returnType);
 }

@@ -6,31 +6,30 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
+import android.app.ActivityManager;
 import android.content.Context;
 import android.content.res.AssetManager;
+import android.net.LocalSocket;
+import android.net.LocalSocketAddress;
 import android.util.Log;
 
 /**
  * Welcome to use Injector tool coded by catfish, hope you can enjoy the
  * injection journey. First of all, you must make sure your device is root
  * access; Secondly you should implement a class whose class name is
- * "com.catfish.undercover.Hook" and with a method declared as
- * "public static void main(String[] args)". This method will be called in
- * target process, you can design everything beginning from this method. Be
- * warning: we do not support native library in target process, which means you
- * can not call your own native method in target process unless you explicitly
- * load a native library with System.load().
+ * "com.catfish.undercover.Undercover" and with a method declared as
+ * "public void onInject()". This method will be called in target process, you
+ * can design everything beginning from this method. Be warning: we do not
+ * support native library in target process, which means you can not call your
+ * own native method in target process unless you explicitly load a native
+ * library with System.load().
  * 
  * import android.util.Log;
  * 
- * public class Hook { 
- *     public final static String TAG = "catfish";
+ * public class Undercover { public final static String TAG = "catfish";
  * 
- *     public static void main(String[] args) {
- *         Log.e(TAG, "hook starts");
- *     }
- * }
- *  
+ * public void onInject() { Log.e(TAG, "hook starts"); } }
+ * 
  * @author catfish
  * 
  */
@@ -58,8 +57,16 @@ public class Injector {
      *            The process name of the target, usually the package name
      */
     public void startInjection(String targetProcess) {
+        if (targetProcess == null || targetProcess.length() == 0) {
+            Log.e(TAG, "empty process name is not allowed");
+            return;
+        }
         transferFiles(EXECUTABLE);
-        startRoot(targetProcess);
+        if (!isInjected(targetProcess)) {
+            startRoot(targetProcess);
+        } else {
+            Log.e(TAG, "target process has been injected");
+        }
     }
 
     private final void transferFiles(String filename) {
@@ -86,6 +93,31 @@ public class Injector {
         } catch (Exception e) {
             Log.e(TAG, "transfer files failed", e);
         }
+    }
+
+    private boolean isInjected(String targetProces) {
+        ActivityManager mActivityManager = (ActivityManager) mContext.getSystemService(Context.ACTIVITY_SERVICE);
+        int tarPid = -1;
+        for (ActivityManager.RunningAppProcessInfo appProcess : mActivityManager.getRunningAppProcesses()) {
+            if (appProcess.processName.equals(targetProces)) {
+                tarPid = appProcess.pid;
+                break;
+            }
+        }
+        if (tarPid < 0) {
+            throw new IllegalArgumentException("did not find a appropriate process, make sure process " + targetProces + " exsits");
+        }
+        LocalSocket sender = new LocalSocket();
+        File source = new File(mContext.getPackageCodePath());
+        boolean result = false;
+        try {
+            sender.connect(new LocalSocketAddress(tarPid + ":" + source.lastModified()));
+            result = sender.isConnected();
+            sender.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return result;
     }
 
     private final void startRoot(String targetProcess) {

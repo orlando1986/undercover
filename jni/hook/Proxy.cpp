@@ -68,17 +68,17 @@ static ArrayObject* boxMethodArgs(const Method* method, const u4* args) {
 void realInvokeOriginalMethodNative(const u4* args, JValue* pResult,
 		const Method* method, ::Thread* self) {
 	Method* meth = dvmGetMethodFromReflectObj((Object*) args[0]);
-    Object* thisObject = (Object*) args[1];
-    ArrayObject* argList = (ArrayObject*) args[2];
-    ArrayObject* params = (ArrayObject*) args[3];
-    ClassObject* returnType = (ClassObject*) args[4];
+	Object* thisObject = (Object*) args[1];
+	ArrayObject* argList = (ArrayObject*) args[2];
+	ArrayObject* params = (ArrayObject*) args[3];
+	ClassObject* returnType = (ClassObject*) args[4];
 
-    pResult->l = dvmInvokeMethod(thisObject, (Method*) meth->insns, argList, params, returnType, true);
+	pResult->l = dvmInvokeMethod(thisObject, (Method*) meth->insns, argList,
+			params, returnType, true);
 }
 
 static void xposedCallHandler(const u4* args, JValue* pResult,
 		const Method* method, ::Thread* self) {
-
 
 	// convert/box arguments
 	Object* thisObject = NULL;
@@ -127,16 +127,20 @@ void initMembers(JNIEnv* env, jclass xposedClass) {
 			(Method*) env->GetStaticMethodID(xposedClass, "handleHookedMethod",
 					"(Ljava/lang/reflect/Method;Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;");
 	invokeOriginalMethodNative =
-			(Method*) env->GetStaticMethodID(xposedClass, "invokeOriginalMethod",
+			(Method*) env->GetStaticMethodID(xposedClass,
+					"invokeOriginalMethod",
 					"(Ljava/lang/reflect/Method;Ljava/lang/Object;[Ljava/lang/Object;[Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
-	dvmSetNativeFunc(invokeOriginalMethodNative, realInvokeOriginalMethodNative, NULL);
+	dvmSetNativeFunc(invokeOriginalMethodNative, realInvokeOriginalMethodNative,
+			NULL);
 }
 
-void hookMethod(JNIEnv* env, jclass clazz, jobject reflectedMethodIndirect,
-		jobject declaredClassIndirect, jint slot,
-		jobject additionalInfoIndirect) {
+static inline bool xposedIsHooked(const Method* method) {
+	return (method->nativeFunc == &xposedCallHandler);
+}
+
+void hookMethod(JNIEnv* env, jclass clazz, jobject reflectedMethodIndirect) {
 	// Usage errors?
-	if (declaredClassIndirect == NULL || reflectedMethodIndirect == NULL) {
+	if (reflectedMethodIndirect == NULL) {
 		dvmThrowIllegalArgumentException(
 				"method and declaredClass must not be null");
 		return;
@@ -151,12 +155,16 @@ void hookMethod(JNIEnv* env, jclass clazz, jobject reflectedMethodIndirect,
 		return;
 	}
 
+	if (xposedIsHooked(method)) {
+		return;
+	}
+
 	// Save a copy of the original method and other hook info
 	Method* hookInfo = (Method*) calloc(1, sizeof(Method));
 	memcpy(hookInfo, method, sizeof(Method));
 
 	// Replace method with our own code
-	method->nativeFunc = xposedCallHandler;
+	method->nativeFunc = &xposedCallHandler;
 	method->insns = (const u2*) hookInfo;
 
 	int argsSize = dvmComputeMethodArgsSize(method) + 1;

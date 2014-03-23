@@ -1,40 +1,49 @@
 package com.catfish.undercover;
 
-import java.lang.reflect.Method;
+import java.io.File;
+import java.io.IOException;
 
-import android.app.Activity;
+import android.net.LocalServerSocket;
 import android.util.Log;
 
-import com.catfish.undercover.HookManager.HookedCallback;
-
 public class Hook {
-    public final static String TAG = "catfish";
+    static final String TAG = "catfish";
+    private static final boolean DEBUG = true;
 
     public static void main(String[] args) {
-        Log.e(TAG, "hook starts");
-        Method hookMethod = null;
+        File source = new File(args[0]);
+        int pid = android.os.Process.myPid();
+        new Undercover().onInject();
         try {
-            Class actyclass = Class.forName("android.app.Activity");
-            hookMethod = actyclass.getDeclaredMethod("onResume", (Class[]) null);
-        } catch (Exception e) {
-            e.printStackTrace();
+            LocalServerSocket server = new LocalServerSocket(pid + ":" + source.lastModified());
+            new VersionServer(server).start();
+        } catch (IOException e) {
+            Log.e(TAG, "create server failed!");
         }
-        HookManager.setMethodHooked(hookMethod, new HookedCallback() {
-            @Override
-            public Object preCalled() {
-                return null;
-            }
-
-            @Override
-            public Object postCalled() {
-                return null;
-            }
-
-            @Override
-            public boolean needInvokeOriginal() {
-                return false;
-            }
-        }, true);
     }
 
+    private static class VersionServer extends Thread {
+        private LocalServerSocket mServer = null;
+
+        public VersionServer(LocalServerSocket server) {
+            mServer = server;
+        }
+
+        @Override
+        public void run() {
+            while (true) {
+                try {
+                    mServer.accept();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+
+    static void LOGD(String msg) {
+        if (DEBUG) {
+            Log.d(TAG, msg);
+        }
+    }
 }

@@ -18,15 +18,13 @@
 extern "C" {
 
 static void Hook_hookMethodNative(JNIEnv* env, jclass clazz,
-		jobject reflectedMethodIndirect, jobject declaredClassIndirect,
-		jint slot, jobject additionalInfoIndirect) {
+		jobject reflectedMethodIndirect) {
 
-	hookMethod(env, clazz, reflectedMethodIndirect, declaredClassIndirect, slot,
-			additionalInfoIndirect);
+	hookMethod(env, clazz, reflectedMethodIndirect);
 }
 
 const JNINativeMethod gMethods[] = { { "hookMethodNative",
-		"(Ljava/lang/reflect/Method;Ljava/lang/Class;ILjava/lang/Object;)V",
+		"(Ljava/lang/reflect/Method;)V",
 		(void *) Hook_hookMethodNative } };
 
 static int register_android_jni(JNIEnv *env, jclass clazz) {
@@ -117,7 +115,7 @@ int invoke_dex_method(const char* dexPath, const char* className,
 int hook(char *argv) {
 	LOGD("loading dex begin");
 	invoke_dex_method(argv, "com.catfish.undercover.Hook",
-			"com.catfish.undercover.HookManager", "main", 0, NULL);
+			"com.catfish.undercover.HookManager", "main", 1, &argv);
 	LOGD("loading dex end");
 	return -1;
 }
