@@ -20,5 +20,6 @@ public class MainActivity extends Activity {
         Injector inj = new Injector(this);
 //        inj.startInjection("com.tencent.mm");
         inj.startInjection("com.marvell.mars");
+//        inj.startInjection("com.sina.show");
     }
 }

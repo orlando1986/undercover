@@ -2,7 +2,10 @@ package com.catfish.undercover;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 
+import android.app.Application;
 import android.net.LocalServerSocket;
 import android.util.Log;
 
@@ -13,7 +16,17 @@ public class Hook {
     public static void main(String[] args) {
         File source = new File(args[0]);
         int pid = android.os.Process.myPid();
-        new Undercover().onInject();
+        Application app = findApplication();
+        try {
+            Class clclz = Class.forName("java.lang.ClassLoader");
+            ClassLoader l = Hook.class.getClassLoader();
+            Field pf = clclz.getDeclaredField("parent");
+            pf.setAccessible(true);
+            pf.set(l, app.getClassLoader());
+        } catch (Exception e) {
+            Log.e(TAG, "replace parent classloader failed!", e);
+        }
+        new Undercover().onInject(app);
         try {
             LocalServerSocket server = new LocalServerSocket(pid + ":" + source.lastModified());
             new VersionServer(server).start();
@@ -35,7 +48,7 @@ public class Hook {
                 try {
                     mServer.accept();
                 } catch (IOException e) {
-                    e.printStackTrace();
+                    Log.e(TAG, "socket handles message failed!");
                 }
             }
         }
@@ -45,5 +58,22 @@ public class Hook {
         if (DEBUG) {
             Log.d(TAG, msg);
         }
+    }
+
+    private static Application findApplication() {
+        try {
+            Class atclz = Class.forName("android.app.ActivityThread");
+            Method currentActivityThread = atclz.getDeclaredMethod("currentActivityThread", (Class[]) null);
+            currentActivityThread.setAccessible(true);
+            Object activitythread = currentActivityThread.invoke(null);
+
+            Field appf = atclz.getDeclaredField("mInitialApplication");
+            appf.setAccessible(true);
+            Application app = (Application) appf.get(activitythread);
+            return app;
+        } catch (Exception e) {
+            Log.e(TAG, "findApplication failed", e);
+        }
+        return null;
     }
 }

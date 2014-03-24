@@ -167,8 +167,8 @@ void hookMethod(JNIEnv* env, jclass clazz, jobject reflectedMethodIndirect) {
 	method->nativeFunc = &xposedCallHandler;
 	method->insns = (const u2*) hookInfo;
 
-	int argsSize = dvmComputeMethodArgsSize(method) + 1;
-	method->registersSize = method->insSize = argsSize;
+//	int argsSize = dvmComputeMethodArgsSize(method) + 1;
+	method->registersSize = method->insSize/* = argsSize*/;
 	method->outsSize = 0;
 	SET_METHOD_FLAG(method, ACC_NATIVE);
 }

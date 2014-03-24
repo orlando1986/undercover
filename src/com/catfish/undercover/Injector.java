@@ -18,17 +18,17 @@ import android.util.Log;
  * injection journey. First of all, you must make sure your device is root
  * access; Secondly you should implement a class whose class name is
  * "com.catfish.undercover.Undercover" and with a method declared as
- * "public void onInject()". This method will be called in target process, you
- * can design everything beginning from this method. Be warning: we do not
- * support native library in target process, which means you can not call your
- * own native method in target process unless you explicitly load a native
- * library with System.load().
+ * "public void onInject(Context application)". This method will be called in
+ * target process, you can design everything beginning from this method. Be
+ * warning: we do not support native library in target process, which means you
+ * can not call your own native method in target process unless you explicitly
+ * load a native library with System.load().
  * 
- * import android.util.Log;
+ * public class Undercover { 
  * 
- * public class Undercover { public final static String TAG = "catfish";
- * 
- * public void onInject() { Log.e(TAG, "hook starts"); } }
+ *     public void onInject(Context application) {
+ *     }
+ * }
  * 
  * @author catfish
  * 
