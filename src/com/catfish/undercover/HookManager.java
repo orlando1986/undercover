@@ -85,7 +85,11 @@ public class HookManager {
             synchronized (hookkedmethod) {
                 hookkedmethod.mMethod = method;
                 if (hookkedmethod.mCallback != null) {
-                    return hookkedmethod.mCallback.invoke(hookkedmethod, thisObject, args);
+                    try {
+                        return hookkedmethod.mCallback.invoke(hookkedmethod, thisObject, args);
+                    } catch (Exception e) {
+                        Log.e(TAG, e.getMessage(), e);
+                    }
                 }
             }
         }

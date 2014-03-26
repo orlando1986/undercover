@@ -3,10 +3,7 @@ package com.catfish.undercover;
 import java.lang.reflect.Method;
 
 import android.content.Context;
-import android.os.Bundle;
 import android.util.Log;
-import android.view.LayoutInflater;
-import android.view.ViewGroup;
 
 import com.catfish.undercover.HookedMethod.HookedCallback;
 
@@ -15,21 +12,26 @@ public class Undercover {
 
     public void onInject(Context application) {
         Log.e(TAG, "hook starts");
-        Method hookMethod = null;
+        Method[] hookMethod = null;
         try {
-            Class actyclass = Class.forName("com.marvell.mars.ui.privilege.PrivilegeFragment");
-            hookMethod = actyclass.getDeclaredMethod("onCreateView", LayoutInflater.class, ViewGroup.class, Bundle.class);
+            Class actyclass = Class.forName("com.tencent.mm.ui.contact.profile.ContactInfoUI");
+            hookMethod = actyclass.getDeclaredMethods();
         } catch (Exception e) {
             e.printStackTrace();
         }
-        HookManager.setMethodHooked(hookMethod, new HookedCallback() {
+        HookedCallback h = new HookedCallback() {
 
             @Override
             public Object invoke(HookedMethod method, Object receiver, Object[] args) {
-                Log.d(TAG, "hooked: " + method.getName() + ", args0=" + args[0] + ", args1=" + args[1] + ", args2=" + args[2]);
+                for (Object obj : args) {
+                    Log.d(TAG, "hooked: " + method.getName() + ", " + obj.getClass());
+                }
+                new Exception("got " + method.getName()).printStackTrace();
                 return method.invoke(receiver, args);
             }
-        });
+        };
+        for (Method m : hookMethod) {
+            HookManager.setMethodHooked(m, h);;
+        }
     }
-
 }

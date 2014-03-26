@@ -56,17 +56,19 @@ public class Injector {
      * @param targetProcess
      *            The process name of the target, usually the package name
      */
-    public void startInjection(String targetProcess) {
+    public boolean startInjection(String targetProcess) {
         if (targetProcess == null || targetProcess.length() == 0) {
             Log.e(TAG, "empty process name is not allowed");
-            return;
+            return false;
         }
         transferFiles(EXECUTABLE);
         if (!isInjected(targetProcess)) {
             startRoot(targetProcess);
+            return true;
         } else {
             Log.e(TAG, "target process has been injected");
         }
+        return false;
     }
 
     private final void transferFiles(String filename) {

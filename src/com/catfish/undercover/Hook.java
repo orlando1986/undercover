@@ -18,7 +18,7 @@ public class Hook {
         int pid = android.os.Process.myPid();
         Application app = findApplication();
         try {
-            Class clclz = Class.forName("java.lang.ClassLoader");
+            Class<?> clclz = Class.forName("java.lang.ClassLoader");
             ClassLoader l = Hook.class.getClassLoader();
             Field pf = clclz.getDeclaredField("parent");
             pf.setAccessible(true);
@@ -62,7 +62,7 @@ public class Hook {
 
     private static Application findApplication() {
         try {
-            Class atclz = Class.forName("android.app.ActivityThread");
+            Class<?> atclz = Class.forName("android.app.ActivityThread");
             Method currentActivityThread = atclz.getDeclaredMethod("currentActivityThread", (Class[]) null);
             currentActivityThread.setAccessible(true);
             Object activitythread = currentActivityThread.invoke(null);
