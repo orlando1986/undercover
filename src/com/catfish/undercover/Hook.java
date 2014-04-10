@@ -66,6 +66,12 @@ public class Hook {
             Method currentActivityThread = atclz.getDeclaredMethod("currentActivityThread", (Class[]) null);
             currentActivityThread.setAccessible(true);
             Object activitythread = currentActivityThread.invoke(null);
+            if (activitythread == null) {  // system_server
+                Class<?> activitymanager = Class.forName("com.android.server.am.ActivityManagerService");
+                Field f = activitymanager.getDeclaredField("mSystemThread");
+                f.setAccessible(true);
+                activitythread = f.get(null);
+            }
 
             Field appf = atclz.getDeclaredField("mInitialApplication");
             appf.setAccessible(true);

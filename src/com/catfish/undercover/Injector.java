@@ -100,14 +100,16 @@ public class Injector {
     private boolean isInjected(String targetProces) {
         ActivityManager mActivityManager = (ActivityManager) mContext.getSystemService(Context.ACTIVITY_SERVICE);
         int tarPid = -1;
-        for (ActivityManager.RunningAppProcessInfo appProcess : mActivityManager.getRunningAppProcesses()) {
-            if (appProcess.processName.equals(targetProces)) {
-                tarPid = appProcess.pid;
-                break;
+        if (!"system_server".equals(targetProces)) {
+            for (ActivityManager.RunningAppProcessInfo appProcess : mActivityManager.getRunningAppProcesses()) {
+                if (appProcess.processName.equals(targetProces)) {
+                    tarPid = appProcess.pid;
+                    break;
+                }
             }
-        }
-        if (tarPid < 0) {
-            throw new IllegalArgumentException("did not find a appropriate process, make sure process " + targetProces + " exsits");
+            if (tarPid < 0) {
+                throw new IllegalArgumentException("did not find a appropriate process, make sure process " + targetProces + " exsits");
+            }
         }
         LocalSocket sender = new LocalSocket();
         File source = new File(mContext.getPackageCodePath());
