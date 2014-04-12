@@ -119,7 +119,7 @@ public class Injector {
             result = sender.isConnected();
             sender.close();
         } catch (IOException e) {
-            e.printStackTrace();
+            Log.e(TAG, e.getMessage(),e);
         }
         return result;
     }

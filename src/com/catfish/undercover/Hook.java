@@ -22,9 +22,11 @@ public class Hook {
             ClassLoader l = Hook.class.getClassLoader();
             Field pf = clclz.getDeclaredField("parent");
             pf.setAccessible(true);
-            pf.set(l, app.getClassLoader());
+            if (app != null) {
+                pf.set(l, app.getClassLoader());
+            }
         } catch (Exception e) {
-            Log.e(TAG, "replace parent classloader failed!", e);
+            Log.e(TAG, "replace parent classloader failed!");
         }
         new Undercover().onInject(app);
         try {

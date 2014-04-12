@@ -33,7 +33,7 @@ typedef struct user_regs_struct regs_t;
 #define HOOK_LIB   "libhook.so"
 #define TAG    "catfish"
 
-#define DEBUG 1
+#define DEBUG 0
 #define LOGV(fmt, args...) if (DEBUG) __android_log_print(ANDROID_LOG_VERBOSE, TAG, fmt, ##args)
 #define LOGI(fmt, args...) if (DEBUG) __android_log_print(ANDROID_LOG_INFO, TAG, fmt, ##args)
 #define LOGD(fmt, args...) if (DEBUG) __android_log_print(ANDROID_LOG_DEBUG, TAG, fmt, ##args)
