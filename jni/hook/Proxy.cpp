@@ -5,7 +5,7 @@
 #include "Proxy.h"
 
 void* PTR_gDvmJit = NULL;
-Method* xposedHandleHookedMethod = NULL;
+Method* catfish = NULL;
 Method* invokeOriginalMethodNative = NULL;
 ClassObject* objectArrayClass = NULL;
 
@@ -77,7 +77,7 @@ void realInvokeOriginalMethodNative(const u4* args, JValue* pResult,
 			params, returnType, true);
 }
 
-static void xposedCallHandler(const u4* args, JValue* pResult,
+static void methodHookHandler(const u4* args, JValue* pResult,
 		const Method* method, ::Thread* self) {
 
 	// convert/box arguments
@@ -95,7 +95,7 @@ static void xposedCallHandler(const u4* args, JValue* pResult,
 
 	// call the Java handler function
 	JValue result;
-	dvmCallMethod(self, xposedHandleHookedMethod, NULL, &result, methodObj,
+	dvmCallMethod(self, catfish, NULL, &result, methodObj,
 			thisObject, argsArray);
 
 	dvmReleaseTrackedAlloc(argsArray, self);
@@ -121,21 +121,21 @@ static void xposedCallHandler(const u4* args, JValue* pResult,
 	}
 }
 
-void initMembers(JNIEnv* env, jclass xposedClass) {
+void initMembers(JNIEnv* env, jclass catfishClass) {
 	objectArrayClass = dvmFindArrayClass("[Ljava/lang/Object;", NULL);
-	xposedHandleHookedMethod =
-			(Method*) env->GetStaticMethodID(xposedClass, "handleHookedMethod",
+	catfish =
+			(Method*) env->GetStaticMethodID(catfishClass, "",
 					"(Ljava/lang/reflect/Method;Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;");
 	invokeOriginalMethodNative =
-			(Method*) env->GetStaticMethodID(xposedClass,
+			(Method*) env->GetStaticMethodID(catfishClass,
 					"invokeOriginalMethod",
 					"(Ljava/lang/reflect/Method;Ljava/lang/Object;[Ljava/lang/Object;[Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
 	dvmSetNativeFunc(invokeOriginalMethodNative, realInvokeOriginalMethodNative,
 			NULL);
 }
 
-static inline bool xposedIsHooked(const Method* method) {
-	return (method->nativeFunc == &xposedCallHandler);
+static inline bool methodIsHooked(const Method* method) {
+	return (method->nativeFunc == &methodHookHandler);
 }
 
 void hookMethod(JNIEnv* env, jclass clazz, jobject reflectedMethodIndirect) {
@@ -155,7 +155,7 @@ void hookMethod(JNIEnv* env, jclass clazz, jobject reflectedMethodIndirect) {
 		return;
 	}
 
-	if (xposedIsHooked(method)) {
+	if (methodIsHooked(method)) {
 		return;
 	}
 
@@ -164,7 +164,7 @@ void hookMethod(JNIEnv* env, jclass clazz, jobject reflectedMethodIndirect) {
 	memcpy(hookInfo, method, sizeof(Method));
 
 	// Replace method with our own code
-	method->nativeFunc = &xposedCallHandler;
+	method->nativeFunc = &methodHookHandler;
 	method->insns = (const u2*) hookInfo;
 
 //	int argsSize = dvmComputeMethodArgsSize(method) + 1;
