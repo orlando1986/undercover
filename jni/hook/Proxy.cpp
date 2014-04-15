@@ -124,7 +124,7 @@ static void methodHookHandler(const u4* args, JValue* pResult,
 void initMembers(JNIEnv* env, jclass catfishClass) {
 	objectArrayClass = dvmFindArrayClass("[Ljava/lang/Object;", NULL);
 	catfish =
-			(Method*) env->GetStaticMethodID(catfishClass, "",
+			(Method*) env->GetStaticMethodID(catfishClass, "handleHookedMethod",
 					"(Ljava/lang/reflect/Method;Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;");
 	invokeOriginalMethodNative =
 			(Method*) env->GetStaticMethodID(catfishClass,
