@@ -3,10 +3,7 @@ package com.catfish.undercover;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 
-import android.app.Activity;
-import android.content.Context;
-import android.content.Intent;
-import android.os.Bundle;
+import android.app.Application;
 import android.util.Log;
 import android.view.View;
 
@@ -15,7 +12,7 @@ import com.catfish.undercover.HookedMethod.HookedCallback;
 public class Undercover {
     public final static String TAG = "catfish";
 
-    public void onInject(Context application) {
+    public void onInject(Application application) {
         Log.e(TAG, "hook starts");
         Method addView = null;
         try {

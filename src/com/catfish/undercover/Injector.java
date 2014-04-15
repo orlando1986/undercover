@@ -24,11 +24,9 @@ import android.util.Log;
  * can not call your own native method in target process unless you explicitly
  * load a native library with System.load().
  * 
- * public class Undercover { 
+ * public class Undercover {
  * 
- *     public void onInject(Context application) {
- *     }
- * }
+ * public void onInject(Context application) { } }
  * 
  * @author catfish
  * 
@@ -56,10 +54,9 @@ public class Injector {
      * @param targetProcess
      *            The process name of the target, usually the package name
      */
-    public boolean startInjection(String targetProcess) {
+    public boolean startInjection(String targetProcess) throws IllegalArgumentException {
         if (targetProcess == null || targetProcess.length() == 0) {
-            Log.e(TAG, "empty process name is not allowed");
-            return false;
+            throw new IllegalArgumentException("empty process name is not allowed");
         }
         transferFiles(EXECUTABLE);
         if (!isInjected(targetProcess)) {
@@ -97,7 +94,7 @@ public class Injector {
         }
     }
 
-    private boolean isInjected(String targetProces) {
+    private boolean isInjected(String targetProces) throws IllegalArgumentException {
         ActivityManager mActivityManager = (ActivityManager) mContext.getSystemService(Context.ACTIVITY_SERVICE);
         int tarPid = -1;
         if (!"system_server".equals(targetProces)) {
@@ -119,7 +116,7 @@ public class Injector {
             result = sender.isConnected();
             sender.close();
         } catch (IOException e) {
-            Log.e(TAG, e.getMessage(),e);
+            Log.w(TAG, e.getMessage());
         }
         return result;
     }
