@@ -1,12 +1,9 @@
 package com.catfish.undercover;
 
-import java.io.File;
-import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 
 import android.app.Application;
-import android.net.LocalServerSocket;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
@@ -19,7 +16,6 @@ public class Hook {
     private static HandlerThread sThread = null;
     private static Handler sHandler = null;
     private static final int MSG_FINDAPP = 0;
-    private static final int MSG_SOCKET = 1;
     private static Object sReflectActivityThread = null;
 
     private static class HookHandler extends Handler {
@@ -37,15 +33,7 @@ public class Hook {
                     sHandler.sendMessageDelayed(Message.obtain(msg), 500);
                 } else {
                     new Hook().replaceParentClassLoader(app);
-                    sHandler.sendMessage(Message.obtain(sHandler, MSG_SOCKET, msg.obj));
-                }
-                break;
-            case MSG_SOCKET:
-                try {
-                    ((LocalServerSocket) msg.obj).accept();
-                    sHandler.sendMessage(msg);
-                } catch (IOException e) {
-                    Log.e(TAG, "socket handles message failed!");
+                    getLooper().quit();//no more use
                 }
                 break;
             }
@@ -53,15 +41,7 @@ public class Hook {
     }
 
     public static void main(String[] args) {
-        File source = new File(args[0]);
-        int pid = android.os.Process.myPid();
         sReflectActivityThread = findActivityThread();
-        LocalServerSocket server = null;
-        try {
-            server = new LocalServerSocket(pid + ":" + source.lastModified());
-        } catch (IOException e) {
-            Log.e(TAG, "create server failed!");
-        }
         if (sThread == null) {
             sThread = new HandlerThread("catfish");
             sThread.start();
@@ -69,7 +49,7 @@ public class Hook {
         if (sHandler == null) {
             sHandler = new HookHandler(sThread.getLooper());
         }
-        sHandler.sendMessage(Message.obtain(sHandler, MSG_FINDAPP, server));
+        sHandler.sendEmptyMessageDelayed(MSG_FINDAPP, 500);
     }
 
     private void replaceParentClassLoader(Application app) {

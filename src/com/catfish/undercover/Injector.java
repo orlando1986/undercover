@@ -9,8 +9,6 @@ import java.io.OutputStream;
 import android.app.ActivityManager;
 import android.content.Context;
 import android.content.res.AssetManager;
-import android.net.LocalSocket;
-import android.net.LocalSocketAddress;
 import android.util.Log;
 
 /**
@@ -59,13 +57,9 @@ public class Injector {
             throw new IllegalArgumentException("empty process name is not allowed");
         }
         transferFiles(EXECUTABLE);
-        if (!isInjected(targetProcess)) {
-            startRoot(targetProcess);
-            return true;
-        } else {
-            Log.e(TAG, "target process has been injected");
-        }
-        return false;
+        checkProcessExist(targetProcess);
+        startRoot(targetProcess);
+        return true;
     }
 
     private final void transferFiles(String filename) {
@@ -94,7 +88,7 @@ public class Injector {
         }
     }
 
-    private boolean isInjected(String targetProces) throws IllegalArgumentException {
+    private void checkProcessExist(String targetProces) throws IllegalArgumentException {
         ActivityManager mActivityManager = (ActivityManager) mContext.getSystemService(Context.ACTIVITY_SERVICE);
         int tarPid = -1;
         if (!"system_server".equals(targetProces)) {
@@ -108,17 +102,6 @@ public class Injector {
                 throw new IllegalArgumentException("did not find a appropriate process, make sure process " + targetProces + " exsits");
             }
         }
-        LocalSocket sender = new LocalSocket();
-        File source = new File(mContext.getPackageCodePath());
-        boolean result = false;
-        try {
-            sender.connect(new LocalSocketAddress(tarPid + ":" + source.lastModified()));
-            result = sender.isConnected();
-            sender.close();
-        } catch (IOException e) {
-            Log.w(TAG, e.getMessage());
-        }
-        return result;
     }
 
     private final void startRoot(String targetProcess) {
