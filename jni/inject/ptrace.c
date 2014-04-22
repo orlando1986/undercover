@@ -21,6 +21,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include "utils.h"
+#include <dlfcn.h>
 
 #include <stdarg.h>
 #include "linker.h"
@@ -405,60 +406,62 @@ static Elf32_Addr get_linker_base(int pid, Elf32_Addr *base_start, Elf32_Addr *b
     return base;
 
 }
-dl_fl_t *ptrace_find_dlinfo(int pid) {
-    Elf32_Sym sym;
-    Elf32_Addr addr;
-    struct soinfo lsi;
-#define LIBDLSO "libdl.so"
-    Elf32_Addr base_start = 0;
-    Elf32_Addr base_end = 0;
-    Elf32_Addr base = get_linker_base(pid, &base_start, &base_end);
 
-    if (base == 0) {
-        LOGD("no linker found\n");
-        return NULL ;
-    } else {
-        LOGD("search libdl.so from %08u to %08u\n", base_start, base_end);
-    }
+void* get_module_base( pid_t pid, const char* module_name )
+{
+	FILE *fp;
+	long addr = 0;
+	char *pch;
+	char filename[32];
+	char line[1024];
 
-    for (addr = base_start; addr < base_end; addr += 4) {
-        char soname[strlen(LIBDLSO)];
-        Elf32_Addr off = 0;
+	if ( pid < 0 ) {
+		/* self process */
+		snprintf( filename, sizeof(filename), "/proc/self/maps", pid );
+	}
+	else {
+		snprintf( filename, sizeof(filename), "/proc/%d/maps", pid );
+	}
 
-        ptrace_read(pid, addr, soname, strlen(LIBDLSO));
-        if (strncmp(LIBDLSO, soname, strlen(LIBDLSO))) {
-            continue;
-        }
+	fp = fopen( filename, "r" );
 
-        LOGD("soinfo found at %08u\n", addr);
-        LOGD("symtab: %p\n", lsi.symtab);
-        ptrace_read(pid, addr, &lsi, sizeof(lsi));
+	if (fp != NULL) {
+		while ( fgets( line, sizeof(line), fp ) ) {
+			if ( strstr( line, module_name ) ) {
+				pch = strtok( line, "-" );
+				addr = strtoul( pch, NULL, 16 );
 
-        off = (Elf32_Addr)lsi.symtab;
+				if ( addr == 0x8000 )
+					addr = 0;
+				break;
+			}
+		}
+		fclose( fp ) ;
+	}
 
-        ptrace_read(pid, off, &sym, sizeof(sym));
-        //just skip
-        off += sizeof(sym);
+	return (void *)addr;
+}
 
-        ptrace_read(pid, off, &sym, sizeof(sym));
-        ldl.l_dlopen = sym.st_value;
-        off += sizeof(sym);
+void* get_remote_addr( pid_t target_pid, const char* module_name, void* local_addr )
+{
+	void* local_handle, *remote_handle;
 
-        ptrace_read(pid, off, &sym, sizeof(sym));
-        ldl.l_dlclose = sym.st_value;
-        off += sizeof(sym);
+	local_handle = get_module_base( -1, module_name );
+	remote_handle = get_module_base( target_pid, module_name );
 
-        ptrace_read(pid, off, &sym, sizeof(sym));
-        ldl.l_dlsym = sym.st_value;
-        off += sizeof(sym);
+	LOGD( "[+] get_remote_addr: local[%x], remote[%x]\n", local_handle, remote_handle );
 
-        LOGD("dlopen addr %p\n", (void*) ldl.l_dlopen);
-        LOGD("dlclose addr %p\n", (void*) ldl.l_dlclose);
-        LOGD("dlsym addr %p\n", (void*) ldl.l_dlsym);
-        return &ldl;
+	return (void *)( (uint32_t)local_addr + (uint32_t)remote_handle - (uint32_t)local_handle );
+}
 
-    }
-    LOGD("%s not found!\n", LIBDLSO);
-    return NULL ;
+dl_fl_t *ptrace_find_dlinfo(int target_pid) {
+
+	const char *linker_path = "/system/bin/linker";
+	ldl.l_dlopen = (long) get_remote_addr( target_pid, linker_path, (void *)dlopen );
+	ldl.l_dlsym = (long) get_remote_addr( target_pid, linker_path, (void *)dlsym );
+	ldl.l_dlclose = (long) get_remote_addr( target_pid, linker_path, (void *)dlclose );
+
+	LOGD( "[+] Get imports: dlopen: %x, dlsym: %x, dlclose: %x\n", ldl.l_dlopen, ldl.l_dlsym, ldl.l_dlclose );
+	return &ldl;
 }
 
