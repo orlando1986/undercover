@@ -106,6 +106,12 @@ int main(int argc, char* argv[]) {
 	ptrace_arg arg;
 	arg.s = argv[3];
 	arg.type = PAT_STR;
+	static char buffer[0x1000];
+	strcpy(buffer, argv[1]);
+	strcat(buffer, "#");
+	strcat(buffer, argv[3]);
+	arg.s = buffer;
+	printf("arg.s=%s\n", arg.s);
 	ptrace_call(pid, proc, 1, &arg);
 	ptrace_detach(pid);
 	LOGD("inject end");

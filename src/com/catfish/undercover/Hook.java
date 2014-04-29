@@ -40,7 +40,14 @@ public class Hook {
         }
     }
 
+    private static boolean hooked = false;
     public static void main(String[] args) {
+        if (hooked) {
+            Log.e(TAG, "Already Hooked");
+            return;
+        }   
+        Log.e(TAG, "Hooking");
+        hooked = true;
         sReflectActivityThread = findActivityThread();
         if (sThread == null) {
             sThread = new HandlerThread("catfish");
@@ -53,6 +60,7 @@ public class Hook {
     }
 
     private void replaceParentClassLoader(Application app) {
+        /*
         try {
             Class<?> clclz = Class.forName("java.lang.ClassLoader");
             ClassLoader l = Hook.class.getClassLoader();
@@ -62,6 +70,7 @@ public class Hook {
         } catch (Exception e) {
             Log.e(TAG, "replace parent classloader failed: " + e.getMessage());
         }
+        */
         new Undercover().onInject(app);
     }
 

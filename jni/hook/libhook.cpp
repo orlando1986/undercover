@@ -31,91 +31,80 @@ static int register_android_jni(JNIEnv *env, jclass clazz) {
 	return env->RegisterNatives(clazz, gMethods, sizeof(gMethods));
 }
 
-int invoke_dex_method(const char* dexPath, const char* className,
-		const char* proxyName, const char* methodName, int argc, char *argv[]) {
+extern jobject findSystemClassLoader(JNIEnv* env);
+extern jobject createDexClassLoader(JNIEnv* env, const char* dexPath, const char* dexOptDir,
+        const char* libPath, jobject parent);
+extern jobject findPathClassLoader(JNIEnv* env, const char *pkgName);
+extern jclass loadTargetClass(JNIEnv* env, jobject dexClassLoaderObject, const char* className);
+
+static jclass sTargetClass = 0;
+int invoke_dex_method(const char* dexPath, const char* className, const char* methodName,
+		const char* proxyName, const char *pkgName, int argc, char *argv[]) {
 	LOGD("Invoke dex E");
 	JNIEnv * env = android::AndroidRuntime::getJNIEnv();
 
-	jclass stringClass, classLoaderClass, dexClassLoaderClass, targetClass,
-			proxyClass;
-	jmethodID getSystemClassLoaderMethod, dexClassLoaderContructor,
-			loadClassMethod, targetMethod, closeDexFile;
-	jobject systemClassLoaderObject, dexClassLoaderObject;
-	jstring dexPathString, dexOptDirString, classNameString, tmpString;
-	jobjectArray stringArray;
+	jclass targetClass;
 
-	/* Get SystemClasLoader */
-	stringClass = (jclass) env->NewGlobalRef(
-			env->FindClass("java/lang/String"));
-	classLoaderClass = (jclass) env->NewGlobalRef(
-			env->FindClass("java/lang/ClassLoader"));
-	dexClassLoaderClass = (jclass) env->NewGlobalRef(
-			env->FindClass("dalvik/system/PathClassLoader"));
-	getSystemClassLoaderMethod = env->GetStaticMethodID(classLoaderClass,
-			"getSystemClassLoader", "()Ljava/lang/ClassLoader;");
-	systemClassLoaderObject = env->CallStaticObjectMethod(classLoaderClass,
-			getSystemClassLoaderMethod);
+	if (sTargetClass == 0) {
+		jobject systemClassLoaderObject = findPathClassLoader(env, pkgName);
+		jobject dexClassLoaderObject = createDexClassLoader(env, dexPath, NULL, NULL,
+				systemClassLoaderObject);
+		targetClass = loadTargetClass(env, dexClassLoaderObject, className);
+		jclass proxyClass = loadTargetClass(env, dexClassLoaderObject, proxyName);
 
-	/* Create DexClassLoader */
-	dexClassLoaderContructor = env->GetMethodID(dexClassLoaderClass, "<init>",
-			"(Ljava/lang/String;Ljava/lang/ClassLoader;)V");
-	dexPathString = (jstring) env->NewGlobalRef(env->NewStringUTF(dexPath));
+		if (!targetClass) {
+			LOGE("Failed to load target class %s", className);
+			return -1;
+		} else {
+			LOGD("target class %s --> %p", className, targetClass);
+		}
 
-	dexClassLoaderObject = env->NewObject(dexClassLoaderClass,
-			dexClassLoaderContructor, dexPathString, systemClassLoaderObject);
+		if (!proxyClass) {
+			LOGE("Failed to load proxyClass class %s", proxyName);
+			return -1;
+		}
 
-	/* Use DexClassLoader to load target class */
-	loadClassMethod = env->GetMethodID(dexClassLoaderClass, "loadClass",
-			"(Ljava/lang/String;)Ljava/lang/Class;");
-	classNameString = (jstring) env->NewGlobalRef(env->NewStringUTF(className));
-	targetClass = (jclass) env->CallObjectMethod(dexClassLoaderObject,
-			loadClassMethod, classNameString);
-
-	classNameString = (jstring) env->NewGlobalRef(env->NewStringUTF(proxyName));
-	proxyClass = (jclass) env->CallObjectMethod(dexClassLoaderObject,
-			loadClassMethod, classNameString);
-
-	if (!targetClass) {
-		LOGE("Failed to load target class %s", className);
-		return -1;
+		register_android_jni(env, proxyClass);
+		initMembers(env, proxyClass);
+		env->DeleteLocalRef(proxyClass);
+		env->DeleteLocalRef(dexClassLoaderObject);
+		env->DeleteLocalRef(systemClassLoaderObject);
+		sTargetClass = (jclass)env->NewGlobalRef(targetClass);
+		env->DeleteLocalRef(targetClass);
+	} else {
+		LOGD("target class %s --> %p, already loaded", className, sTargetClass);
 	}
-
-	if (!proxyClass) {
-		LOGE("Failed to load proxyClass class %s", proxyName);
-		return -1;
-	}
-
-	register_android_jni(env, proxyClass);
-	initMembers(env, proxyClass);
-
 	/* Invoke target method*/
-	targetMethod = env->GetStaticMethodID(targetClass, methodName,
+	jmethodID targetMethod = env->GetStaticMethodID(sTargetClass, methodName,
 			"([Ljava/lang/String;)V");
 	if (!targetMethod) {
 		LOGE("Failed to load target method %s", methodName);
 		return -1;
 	}
 
-	stringArray = env->NewObjectArray(argc, stringClass, NULL);
+	jclass stringClass = (jclass) env->FindClass("java/lang/String");
+	jobjectArray stringArray = env->NewObjectArray(argc, stringClass, NULL);
+	LOGD("stringArray %p", stringArray);
 	for (int i = 0; i < argc; i++) {
-		tmpString = env->NewStringUTF(argv[i]);
+		jstring tmpString = env->NewStringUTF(argv[i]);
 		env->SetObjectArrayElement(stringArray, i, tmpString);
+		env->DeleteLocalRef(tmpString);
 	}
-
-	env->CallStaticVoidMethod(targetClass, targetMethod, stringArray);
-	env->DeleteGlobalRef(stringClass);
-	env->DeleteGlobalRef(classLoaderClass);
-	env->DeleteGlobalRef(dexClassLoaderClass);
-	env->DeleteGlobalRef(dexPathString);
-	env->DeleteGlobalRef(dexOptDirString);
+	env->CallStaticVoidMethod(sTargetClass, targetMethod, stringArray);
+	env->DeleteLocalRef(stringClass);
+	env->DeleteLocalRef(stringArray);
 	LOGD("Invoke dex X");
 	return 0;
 }
 
 int hook(char *argv) {
-	LOGD("loading dex begin");
-	invoke_dex_method(argv, "com.catfish.undercover.Hook",
-			"com.catfish.undercover.HookManager", "main", 1, &argv);
+	char *pkgName = argv;
+	while (*argv !='#')argv++;
+	*argv = 0;
+	argv++;
+	LOGD("loading dex begin %s", argv);
+	invoke_dex_method(argv, "com.catfish.undercover.Hook", "main",
+			"com.catfish.undercover.HookManager", pkgName, 1, &argv);
 	LOGD("loading dex end");
 	return -1;
 }
