@@ -42,6 +42,8 @@ jobject findPathClassLoader(JNIEnv* env, const char *pkgName) {
     LOADER_LOGD("findPathClassLoader(%p, %s) E", env, pkgName);
     jclass atClass = env->FindClass("android/app/ActivityThread");
     PRINT_VAR(atClass);
+    jobject atObject = 0;
+
     jfieldID sMainThreadHandlerFieldID = env->GetStaticFieldID(atClass,
             "sMainThreadHandler", "Landroid/os/Handler;");
     PRINT_VAR(sMainThreadHandlerFieldID);
@@ -51,12 +53,24 @@ jobject findPathClassLoader(JNIEnv* env, const char *pkgName) {
     PRINT_VAR(hClass);
     jfieldID atFieldID = env->GetFieldID(hClass, "this$0", "Landroid/app/ActivityThread;");
     PRINT_VAR(atFieldID);
-    jobject atObjet = env->GetObjectField(sMainThreadHandler, atFieldID);
-    PRINT_VAR(atObjet);
+    atObject = env->GetObjectField(sMainThreadHandler, atFieldID);
+    PRINT_VAR(atObject);
+
+    if (!atObject) {
+        LOADER_LOGE("failed to get ActivityThread, try another way");
+        jmethodID catMethod = env->GetStaticMethodID(atClass, "currentActivityThread", "()Landroid/app/ActivityThread;");
+        PRINT_VAR(catMethod);
+        atObject = env->CallStaticObjectMethod(atClass, catMethod);
+        PRINT_VAR(atObject);
+    }
+    if (!atObject) {
+        LOADER_LOGE("BAD!!! Cannot to get ActivityThread. Suppose you should not see me.");
+    }
+
     jmethodID peekPackageInfoMethodID = env->GetMethodID(atClass, "peekPackageInfo",
             "(Ljava/lang/String;Z)Landroid/app/LoadedApk;");
     PRINT_VAR(peekPackageInfoMethodID);
-    jobject loadedApkObject = env->CallObjectMethod(atObjet, peekPackageInfoMethodID,
+    jobject loadedApkObject = env->CallObjectMethod(atObject, peekPackageInfoMethodID,
             env->NewStringUTF(pkgName), 1);
     PRINT_VAR(loadedApkObject);
     jclass loadedApkClass = env->FindClass("android/app/LoadedApk");
@@ -70,7 +84,7 @@ jobject findPathClassLoader(JNIEnv* env, const char *pkgName) {
     env->DeleteLocalRef(atClass);
     env->DeleteLocalRef(sMainThreadHandler);
     env->DeleteLocalRef(hClass);
-    env->DeleteLocalRef(atObjet);
+    env->DeleteLocalRef(atObject);
     env->DeleteLocalRef(loadedApkObject);
     env->DeleteLocalRef(loadedApkClass);
     return mClassLoaderObject;
@@ -96,7 +110,7 @@ extern "C"
 jobject createDexClassLoader(JNIEnv* env, const char* dexPath, const char* dexOptDir,
         const char* libPath, jobject parent) {
     LOADER_LOGD("createDexClassLoader(%p, %s, %s, %s, %p) E", env, dexPath, dexOptDir, libPath, parent);
-    int usePathClassLoader = (dexOptDir == NULL || strcmp("", dexOptDir) == 0);
+    int usePathClassLoader = (dexOptDir == NULL || strcmp("", dexOptDir) == 0 || strcmp(".", dexOptDir) == 0);
     jclass dexClassLoaderClass = 0;
     if (usePathClassLoader) {
         dexClassLoaderClass = env->FindClass("dalvik/system/PathClassLoader");
