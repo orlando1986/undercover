@@ -37,56 +37,48 @@ extern "C" void jniLogException(JNIEnv* env, int priority, const char* tag, jthr
 
 static const char* const CLASS_NAME_CLASSLOADERPROXY = "android.os.ClassLoaderProxy";
 
+static int catchException(JNIEnv* env);
+static jobject getClassLoader(JNIEnv* env, jclass cls);
+static jclass getClass(JNIEnv* env, jobject obj);
+static jobject getClassLoader(JNIEnv* env, jclass cls);
+
+static jobject getClassLoaderByApplication(JNIEnv* env, jobject obj) {
+	jclass cls = env->FindClass("android/app/Application");
+    jmethodID getClassLoaderMethodID = env->GetMethodID(cls, "getClassLoader", "()Ljava/lang/ClassLoader;");
+    jobject classLoaderObject = env->CallObjectMethod(obj, getClassLoaderMethodID);
+    env->DeleteLocalRef(cls);
+    return classLoaderObject;
+}
+
 extern "C"
 jobject findPathClassLoader(JNIEnv* env, const char *pkgName) {
     LOADER_LOGD("findPathClassLoader(%p, %s) E", env, pkgName);
     jclass atClass = env->FindClass("android/app/ActivityThread");
     PRINT_VAR(atClass);
-    jobject atObject = 0;
 
-    jfieldID sMainThreadHandlerFieldID = env->GetStaticFieldID(atClass,
-            "sMainThreadHandler", "Landroid/os/Handler;");
-    PRINT_VAR(sMainThreadHandlerFieldID);
-    jobject sMainThreadHandler = env->GetStaticObjectField(atClass, sMainThreadHandlerFieldID);
-    PRINT_VAR(sMainThreadHandler);
-    jclass hClass = env->FindClass("android/app/ActivityThread$H");
-    PRINT_VAR(hClass);
-    jfieldID atFieldID = env->GetFieldID(hClass, "this$0", "Landroid/app/ActivityThread;");
-    PRINT_VAR(atFieldID);
-    atObject = env->GetObjectField(sMainThreadHandler, atFieldID);
+    jobject atObject = 0;
+    jmethodID catMethod = env->GetStaticMethodID(atClass, "currentActivityThread", "()Landroid/app/ActivityThread;");
+    PRINT_VAR(catMethod);
+    atObject = env->CallStaticObjectMethod(atClass, catMethod);
     PRINT_VAR(atObject);
 
-    if (!atObject) {
-        LOADER_LOGE("failed to get ActivityThread, try another way");
-        jmethodID catMethod = env->GetStaticMethodID(atClass, "currentActivityThread", "()Landroid/app/ActivityThread;");
-        PRINT_VAR(catMethod);
-        atObject = env->CallStaticObjectMethod(atClass, catMethod);
-        PRINT_VAR(atObject);
-    }
     if (!atObject) {
         LOADER_LOGE("BAD!!! Cannot to get ActivityThread. Suppose you should not see me.");
     }
 
-    jmethodID peekPackageInfoMethodID = env->GetMethodID(atClass, "peekPackageInfo",
-            "(Ljava/lang/String;Z)Landroid/app/LoadedApk;");
-    PRINT_VAR(peekPackageInfoMethodID);
-    jobject loadedApkObject = env->CallObjectMethod(atObject, peekPackageInfoMethodID,
-            env->NewStringUTF(pkgName), 1);
-    PRINT_VAR(loadedApkObject);
-    jclass loadedApkClass = env->FindClass("android/app/LoadedApk");
-    PRINT_VAR(loadedApkClass);
-    jfieldID mClassLoaderFieldID = env->GetFieldID(loadedApkClass, "mClassLoader",
-            "Ljava/lang/ClassLoader;");
-    PRINT_VAR(mClassLoaderFieldID);
-    jobject mClassLoaderObject = env->GetObjectField(loadedApkObject, mClassLoaderFieldID);
+    jobject mClassLoaderObject = 0;
+    jmethodID getApplicationMethod = env->GetMethodID(atClass, "getApplication",
+                    "()Landroid/app/Application;");
+    PRINT_VAR(getApplicationMethod);
+    jobject appObject = env->CallObjectMethod(atObject, getApplicationMethod);
+    PRINT_VAR(appObject);
+    mClassLoaderObject = getClassLoaderByApplication(env, appObject);
+    env->DeleteLocalRef(appObject);
+
     PRINT_VAR(mClassLoaderObject);
     LOADER_LOGD("findPathClassLoader(%p, %s) X, %p", env, pkgName, mClassLoaderObject);
     env->DeleteLocalRef(atClass);
-    env->DeleteLocalRef(sMainThreadHandler);
-    env->DeleteLocalRef(hClass);
     env->DeleteLocalRef(atObject);
-    env->DeleteLocalRef(loadedApkObject);
-    env->DeleteLocalRef(loadedApkClass);
     return mClassLoaderObject;
 }
 
