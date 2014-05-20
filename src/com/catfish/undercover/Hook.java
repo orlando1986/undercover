@@ -33,7 +33,7 @@ public class Hook {
                     sHandler.sendMessageDelayed(Message.obtain(msg), 500);
                 } else {
                     new Hook().replaceParentClassLoader(app);
-                    getLooper().quit();//no more use
+                    getLooper().quit();// no more use
                 }
                 break;
             }
@@ -41,26 +41,20 @@ public class Hook {
     }
 
     private static boolean hooked = false;
+
     public static void main(String[] args) {
         if (hooked) {
             Log.e(TAG, "Already Hooked");
             return;
-        }   
+        }
         Log.e(TAG, "Hooking");
         hooked = true;
         sReflectActivityThread = findActivityThread();
-        if (sThread == null) {
-            sThread = new HandlerThread("catfish");
-            sThread.start();
-        }
-        if (sHandler == null) {
-            sHandler = new HookHandler(sThread.getLooper());
-        }
-        sHandler.sendEmptyMessageDelayed(MSG_FINDAPP, 500);
+        Application app = findApplication(sReflectActivityThread);
+        new Hook().replaceParentClassLoader(app);
     }
 
     private void replaceParentClassLoader(Application app) {
-        /*
         try {
             Class<?> clclz = Class.forName("java.lang.ClassLoader");
             ClassLoader l = Hook.class.getClassLoader();
@@ -70,7 +64,6 @@ public class Hook {
         } catch (Exception e) {
             Log.e(TAG, "replace parent classloader failed: " + e.getMessage());
         }
-        */
         new Undercover().onInject(app);
     }
 
