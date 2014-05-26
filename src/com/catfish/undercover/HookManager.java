@@ -55,10 +55,8 @@ public class HookManager {
     public static HookedCallback getHookedCallback(Method m) {
         String key = generateKey(m);
         HookedMethod hm = sMethodCache.get(key);
-        synchronized (sMethodCache) {
-            if (hm != null) {
-                return hm.mCallback;
-            }
+        if (hm != null) {
+            return hm.mCallback;
         }
         return null;
     }
@@ -82,14 +80,12 @@ public class HookManager {
 
         HookedMethod hookkedmethod = sMethodCache.get(generateKey(method));
         if (hookkedmethod != null) {
-            synchronized (hookkedmethod) {
-                hookkedmethod.mMethod = method;
-                if (hookkedmethod.mCallback != null) {
-                    try {
-                        return hookkedmethod.mCallback.invoke(hookkedmethod, thisObject, args);
-                    } catch (Exception e) {
-                        Log.e(TAG, e.getMessage(), e);
-                    }
+            hookkedmethod.mMethod = method;
+            if (hookkedmethod.mCallback != null) {
+                try {
+                    return hookkedmethod.mCallback.invoke(hookkedmethod, thisObject, args);
+                } catch (Exception e) {
+                    Log.e(TAG, e.getMessage(), e);
                 }
             }
         }
@@ -100,5 +96,6 @@ public class HookManager {
 
     private native synchronized static void hookMethodNative(Method method);
 
-    native synchronized static Object invokeOriginalMethod(Method method, Object obj, Object[] args, Object[] param, Object returnType);
+    native synchronized static Object invokeOriginalMethod(Method method, Object obj, Object[] args, Object[] param,
+            Object returnType);
 }
