@@ -38,6 +38,11 @@ extern jobject findPathClassLoader(JNIEnv* env, const char *pkgName);
 extern jclass loadTargetClass(JNIEnv* env, jobject dexClassLoaderObject, const char* className);
 
 static jclass sTargetClass = 0;
+#define SIZE 0x100
+static const char* PATHS[SIZE];
+static jclass CLASS[SIZE];
+static int sSize = 0;
+
 int invoke_dex_method(const char* dexPath, const char* className, const char* methodName,
 		const char* proxyName, const char *pkgName, int argc, char *argv[]) {
 	LOGD("Invoke dex E");
@@ -45,7 +50,19 @@ int invoke_dex_method(const char* dexPath, const char* className, const char* me
 
 	jclass targetClass;
 
-	if (sTargetClass == 0) {
+	if (sSize == 0) {
+		memset(PATHS, 0, sizeof(PATHS));
+		memset(CLASS, 0, sizeof(CLASS));
+	}
+
+	int i = 0;
+	for (i = 0; i < sSize; i++) {
+		if (PATHS[i] && !strcmp(dexPath, PATHS[i])) {
+			break;
+		}
+	}
+
+	if (i == sSize || CLASS[i] == 0) {
 		jobject systemClassLoaderObject = findPathClassLoader(env, pkgName);
 		jobject dexClassLoaderObject = createDexClassLoader(env, dexPath, NULL, NULL,
 				systemClassLoaderObject);
@@ -69,13 +86,15 @@ int invoke_dex_method(const char* dexPath, const char* className, const char* me
 		env->DeleteLocalRef(proxyClass);
 		env->DeleteLocalRef(dexClassLoaderObject);
 		env->DeleteLocalRef(systemClassLoaderObject);
-		sTargetClass = (jclass)env->NewGlobalRef(targetClass);
+		CLASS[i] = (jclass)env->NewGlobalRef(targetClass);
+		PATHS[i] = dexPath;
 		env->DeleteLocalRef(targetClass);
+		sSize++;
 	} else {
-		LOGD("target class %s --> %p, already loaded", className, sTargetClass);
+		LOGD("target class %s --> %p, already loaded, i=%d", className, CLASS[i], i);
 	}
 	/* Invoke target method*/
-	jmethodID targetMethod = env->GetStaticMethodID(sTargetClass, methodName,
+	jmethodID targetMethod = env->GetStaticMethodID(CLASS[i], methodName,
 			"([Ljava/lang/String;)V");
 	if (!targetMethod) {
 		LOGE("Failed to load target method %s", methodName);
@@ -90,7 +109,7 @@ int invoke_dex_method(const char* dexPath, const char* className, const char* me
 		env->SetObjectArrayElement(stringArray, i, tmpString);
 		env->DeleteLocalRef(tmpString);
 	}
-	env->CallStaticVoidMethod(sTargetClass, targetMethod, stringArray);
+	env->CallStaticVoidMethod(CLASS[i], targetMethod, stringArray);
 	env->DeleteLocalRef(stringClass);
 	env->DeleteLocalRef(stringArray);
 	LOGD("Invoke dex X");
