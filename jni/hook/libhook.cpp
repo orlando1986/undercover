@@ -63,7 +63,12 @@ int invoke_dex_method(const char* dexPath, const char* className, const char* me
 	}
 
 	if (i == sSize || CLASS[i] == 0) {
-		jobject systemClassLoaderObject = findPathClassLoader(env, pkgName);
+		jobject systemClassLoaderObject = 0;
+	    if (strcmp(pkgName, "system_server") == 0) {
+	    	systemClassLoaderObject = findSystemClassLoader(env);
+	    } else {
+	    	systemClassLoaderObject = findPathClassLoader(env, pkgName);
+	    }
 		jobject dexClassLoaderObject = createDexClassLoader(env, dexPath, NULL, NULL,
 				systemClassLoaderObject);
 		targetClass = loadTargetClass(env, dexClassLoaderObject, className);
