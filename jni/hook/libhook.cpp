@@ -24,18 +24,18 @@ static void Hook_hookMethodNative(JNIEnv* env, jclass clazz,
 }
 
 const JNINativeMethod gMethods[] = { { "hookMethodNative",
-		"(Ljava/lang/reflect/Method;)V",
-		(void *) Hook_hookMethodNative } };
+		"(Ljava/lang/reflect/Method;)V", (void *) Hook_hookMethodNative } };
 
 static int register_android_jni(JNIEnv *env, jclass clazz) {
 	return env->RegisterNatives(clazz, gMethods, sizeof(gMethods));
 }
 
 extern jobject findSystemClassLoader(JNIEnv* env);
-extern jobject createDexClassLoader(JNIEnv* env, const char* dexPath, const char* dexOptDir,
-        const char* libPath, jobject parent);
+extern jobject createDexClassLoader(JNIEnv* env, const char* dexPath,
+		const char* dexOptDir, const char* libPath, jobject parent);
 extern jobject findPathClassLoader(JNIEnv* env, const char *pkgName);
-extern jclass loadTargetClass(JNIEnv* env, jobject dexClassLoaderObject, const char* className);
+extern jclass loadTargetClass(JNIEnv* env, jobject dexClassLoaderObject,
+		const char* className);
 
 static jclass sTargetClass = 0;
 #define SIZE 0x100
@@ -43,8 +43,9 @@ static const char* PATHS[SIZE];
 static jclass CLASS[SIZE];
 static int sSize = 0;
 
-int invoke_dex_method(const char* dexPath, const char* className, const char* methodName,
-		const char* proxyName, const char *pkgName, int argc, char *argv[]) {
+int invoke_dex_method(const char* dexPath, const char* className,
+		const char* methodName, const char* proxyName, const char *pkgName,
+		int argc, char *argv[]) {
 	LOGD("Invoke dex E");
 	JNIEnv * env = android::AndroidRuntime::getJNIEnv();
 
@@ -64,15 +65,16 @@ int invoke_dex_method(const char* dexPath, const char* className, const char* me
 
 	if (i == sSize || CLASS[i] == 0) {
 		jobject systemClassLoaderObject = 0;
-	    if (strcmp(pkgName, "system_server") == 0) {
-	    	systemClassLoaderObject = findSystemClassLoader(env);
-	    } else {
-	    	systemClassLoaderObject = findPathClassLoader(env, pkgName);
-	    }
-		jobject dexClassLoaderObject = createDexClassLoader(env, dexPath, NULL, NULL,
-				systemClassLoaderObject);
+		if (strcmp(pkgName, "system_server") == 0) {
+			systemClassLoaderObject = findSystemClassLoader(env);
+		} else {
+			systemClassLoaderObject = findPathClassLoader(env, pkgName);
+		}
+		jobject dexClassLoaderObject = createDexClassLoader(env, dexPath, NULL,
+				NULL, systemClassLoaderObject);
 		targetClass = loadTargetClass(env, dexClassLoaderObject, className);
-		jclass proxyClass = loadTargetClass(env, dexClassLoaderObject, proxyName);
+		jclass proxyClass = loadTargetClass(env, dexClassLoaderObject,
+				proxyName);
 
 		if (!targetClass) {
 			LOGE("Failed to load target class %s", className);
@@ -91,12 +93,13 @@ int invoke_dex_method(const char* dexPath, const char* className, const char* me
 		env->DeleteLocalRef(proxyClass);
 		env->DeleteLocalRef(dexClassLoaderObject);
 		env->DeleteLocalRef(systemClassLoaderObject);
-		CLASS[i] = (jclass)env->NewGlobalRef(targetClass);
+		CLASS[i] = (jclass) env->NewGlobalRef(targetClass);
 		PATHS[i] = dexPath;
 		env->DeleteLocalRef(targetClass);
 		sSize++;
 	} else {
-		LOGD("target class %s --> %p, already loaded, i=%d", className, CLASS[i], i);
+		LOGD("target class %s --> %p, already loaded, i=%d",
+				className, CLASS[i], i);
 	}
 	/* Invoke target method*/
 	jmethodID targetMethod = env->GetStaticMethodID(CLASS[i], methodName,
@@ -123,7 +126,8 @@ int invoke_dex_method(const char* dexPath, const char* className, const char* me
 
 int hook(char *argv) {
 	char *pkgName = argv;
-	while (*argv !='#')argv++;
+	while (*argv != '#')
+		argv++;
 	*argv = 0;
 	argv++;
 	LOGD("loading dex begin %s", argv);
@@ -131,5 +135,24 @@ int hook(char *argv) {
 			"com.catfish.undercover.HookManager", pkgName, 1, &argv);
 	LOGD("loading dex end");
 	return -1;
+}
+
+JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* reserved) {
+	JNIEnv* env = NULL;
+	jint result = -1;
+
+	if (vm->GetEnv((void**) &env, JNI_VERSION_1_4) != JNI_OK) {
+		return -1;
+	}
+	assert(env != NULL);
+
+	jclass proxyClass = env->FindClass("com.catfish.undercover.HookManager");
+
+	register_android_jni(env, proxyClass);
+	initMembers(env, proxyClass);
+
+	result = JNI_VERSION_1_4;
+
+	return result;
 }
 }
